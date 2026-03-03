@@ -4,8 +4,9 @@
 
 ## Horario
 
-+ Martes y Jueves 18:00 a 20:00 hrs. En línea.
-+ Sábado de 10:00 a 12:00 hrs. En línea
++ Martes: 18:00 a 20:00 hrs. En línea.
++ Jueves: 18:00 a 20:30 hrs. En línea.
++ Sábado: 9:30 a 12:00 hrs. En línea
 
 ## Sesiones 
 - [Sesion 1: 3 de marzo de 2026](./sesion01)
