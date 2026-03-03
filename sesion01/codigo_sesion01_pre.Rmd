@@ -16,7 +16,7 @@ library(magrittr) # Algunos operadores de asignación
 library(palmerpenguins) # El dataset de los pingüinitos
 library(visdat) # Visualización de los datos faltantes
 library(skimr) # Para generer métricas
-library(janitor) # Para embellecer
+library(janitor) # Para limpieza
 library(moments) # Calcular la kurtosis y la skewness
 library(hexbin) # Auxiliar para visualización
 ```
