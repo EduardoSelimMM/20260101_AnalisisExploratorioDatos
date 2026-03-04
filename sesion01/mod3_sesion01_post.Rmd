@@ -1,0 +1,744 @@
+---
+title: "Sesión 1"
+author: "Mi fabuloso nombre"
+date: "3 de marzo de 2026"
+output: html_document
+---
+
+# Introducción al Análisis Exploratorio de Datos
+
+```{r}
+library(ggplot2) # Visualizaciones
+library(ggExtra) # Visualizaciones
+library(corrplot) # Visualizaciones de la matriz de correlación
+library(dplyr) # Operaciones entre dataframes
+library(magrittr) # Algunos operadores de asignación %>%, <>
+library(palmerpenguins) # El dataset de los pingüinitos
+library(visdat) # Visualización de los datos faltantes
+library(skimr) # Para generer métricas
+library(janitor) # Para limpieza
+library(moments) # Calcular la kurtosis y la skewness
+library(hexbin) # Auxiliar para visualización
+```
+
++ A lo largo de estas sesiones, intentaremos generar algunos mecanismos gráficos y numéricos (formales), que nos permitirán establecer algunas hipótesis sobre nuestros datos. Para después pasar a algún modelo de ML.
+
++ La idea es construir un pipeline lo más general posible, para tener un reporte lo más general posible. Todo depende de la calidad y estructura de nuestros.
+
++ **IMPORTANTE**: Siempre podremos generar un reporte, pero no siempre será informativo. Todo dependerá del contexto de nuestros datos...
+
++ Es decir, intentaremos crear funciones para cualquier conjunto de datos, pero no siempre nos devolverá un informe tan detallado como queremos.
+
++ En esta sesión trabajaremos con el dataset `msleep` que viene dentro de la librería {ggplot2}
+
++ An updated and expanded version of the mammals sleep dataset. This is an updated and expanded version of the mammals sleep dataset. Updated sleep times and weights were taken from V. M. Savage and G. B. West. A quantitative, theoretical framework for understanding mammalian sleep. Proceedings of the National Academy of Sciences, 104 (3):1051-1056, 2007.
+
++ A data frame with 83 rows and 11 variables:
+
++ Asignemos este dataset a un objeto llamado `datos`
+
+```{r}
+datos <- ggplot2::msleep
+```
+
++ Demos un vistazo a este dataframe
+
+```{r}
+datos |> head()
+```
+
++ Empecemos con lo clásico: las medidas de tendencia central [media, mediana y moda]. Para variables numéricas la media (`mean()`) y la mediana (`median()`) y para variables categóricas la moda.
+
++ Algo muy común es querer calcular la media de una sola columna. Para calcular la media de una sola columna, p. eg. `sleep_total`
+
+```{r}
+datos$sleep_total |> mean()
+```
+
++ El objeto `datos$sleep_total` es un vector y por tanto tiene sentido calcular su media.
+
++ Otra manera es con el operador %$% (se usa para invocar los nombres de las columnas de un dataset). Este operador viene de la librería {magritr}
+
+```{r}
+datos %$% mean(sleep_total)
+```
++ Lo mismo ocurrirá con la mediana:
+
+```{r}
+datos$sleep_total |> median()
+```
+
++ Con el operador %$%
+
+```{r}
+datos %$% median(sleep_total)
+```
++ Observación. R base no tiene una función para la moda. La vamos a tener que escribir a mano o de alguna librería.
+
+```{r}
+datos |> dplyr::select(vore) |> unique()
+```
+
++ Primero, cómo obtendríamos una tabla de frecuencias. Con la función table()
+
+```{r}
+datos |> dplyr::select(vore) |> table()
+```
+```{r}
+datos %$% table(vore)
+```
++ Vamos a guardar esta tabla en un objeto
+
+```{r}
+tabla_frecuencias <- datos %$% table(vore)
+```
+
+```{r}
+tabla_frecuencias |> class()
+```
+
+```{r}
+tabla_frecuencias |> str()
+```
+
+```{r}
+# Vamos a ordenar las frecuencias de la tabla de menor a mayor
+tabla_frecuencias |> sort()
+```
+
+```{r}
+# Vamos a ordenar las frecuencias de la tabla de mayor a menor
+tabla_frecuencias |> sort() |> rev()
+```
+
+```{r}
+tabla_ordenada <- tabla_frecuencias |> sort() |> rev()
+```
+
+```{r}
+tabla_ordenada[1]
+```
++ OJO: Esta forma de calcular la moda no siempre va a servir. Por que en este caso hay una única moda, por eso basto con seleccionar al primero. Pero si hay más de una moda este método no funcionará. Hay que pensar en una forma más robusta.
+
++ Lo que sigue, son las famosas medidas de dispersión: varianza, desviación estándar, rango, rango intercuartil
+
++ Para calcular la media de una sola columna `sleep_total`
+
+```{r}
+datos$sleep_total |> var()
+```
+
+```{r}
+datos %$% var(sleep_total)
+```
+```{r}
+# Desviación estándar
+datos$sleep_total |> sd()
+```
+
++ Ahora la desviación estándar de una columna
+
+```{r}
+# Desviación estándar
+datos %$% sd(sleep_total)
+```
+
+```{r}
+# Rango Intercuartil (Q3 - Q1)
+# La función IQR (Inter Quantile Range) es de R base
+datos$sleep_total |> IQR()
+```
+```{r}
+# Rango Intercuartil (Q3 - Q1)
+datos %$% IQR(sleep_total)
+```
+
++ Ya que estamos hablando de cuantiles. Nos gustaría calcular algunos cuantiles de alguna columna numérica
+
+```{r}
+# La función quantile() también es de R base
+# Algunos cuantiles
+datos$sleep_total |> quantile()
+```
+
++ min = 1.90
++ max = 19.90
++ Q1 = 7.85 (cuartil 1)
++ Q2 = mediana = 10.10
++ Q3 = 13.75 (cartil 3)
+
++ ¿Qué pasa si quiero otros cuantiles? No necesariamente los cuartiles. Le agregamos el parámetro probs, que nos deja poner el nivel de los cuantiles que queremos.
+
+```{r}
+# Cuantiles específicos
+datos$sleep_total |> quantile(probs = c(0.65, 0.80, 0.95))
+```
+
+```{r}
+# Deciles
+datos$sleep_total |> quantile(probs = 
+                                c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9))
+```
+
+
++ Finalmente el rango
+
+```{r}
+# Máximo
+datos$sleep_total |> max()
+```
+```{r}
+# Mínimo
+datos$sleep_total |> min()
+```
+
+```{r}
+# Rango = Max - Min
+datos$sleep_total |> range()
+# range me devuelve un vector con el mínimo y el máximo
+```
+
+```{r}
+# Hago la diferencia de las dos entradas del vector
+# Rango = Max - Min
+datos$sleep_total |> range() |> diff()
+```
++ Si no usáramos el operador de pipa |>, la sintaxis sería más complicada de leer
+
+```{r}
+diff(range(datos$sleep_total))
+```
+
+```{r}
+sd(datos$sleep_total)
+```
+
+$$Var(\bar{X}) = Var(\frac{1}{n}\sum_{j=1}^n X_j) = \frac{1}{n^2}Var(\sum_{j=1}^n X_j) = \frac{1}{n^2}\sum_{j=1}^nVar(X_i) = \frac{1}{n^2}n\sigma^2 = \frac{\sigma^2}{n}$$
+Entonces
+
+$$SD(\bar{X}) = \frac{\sigma}{\sqrt{n}}$$
+$$SD(X_j) = \sqrt{Var(X_j)} = \sqrt{\sigma^2} = \sigma$$
+
+```{r}
+#Error estándar sigma/raiz de n
+sd(datos$sleep_total)/sqrt(nrow(datos))
+```
+
++ También lo podemos hacer con la función std.error() de la librería {plotrix}
+
+```{r}
+datos$sleep_total |> plotrix::std.error()
+```
+
++ Ya tenemos medidas de tendencia central, medidas de dispersión, medidas de localización (cuantiles). Nos faltan medidas de "picudez" y de asimetría
+
+```{r}
+# Coeficiente de asimetría a.k.a. skewness
+# Tercer momento centrado y estádarizado
+datos$sleep_total |> moments::skewness() 
+```
+$$E\left[\left(\frac{X-E(X)}{SD(X)}\right)^3\right]$$
+
+$$E\left[\left(\frac{X-\mu}{\sigma}\right)^3\right]$$
+
+```{r}
+# Coeficiente de kurtosis a.k.a. "picudez" o "pesadez de las colas"
+# Cuarto momento centrado y estádarizado
+datos$sleep_total |> moments::kurtosis() 
+```
+
+$$E\left[\left(\frac{X-E(X)}{SD(X)}\right)^4\right]$$
+
+$$E\left[\left(\frac{X-\mu}{\sigma}\right)^4\right]$$
+
++ Otra cosa que solemos calcular con variables numéricas es la correlación entre dos variables, en este caso entre dos columnas numéricas. Ocupamos la función `cor()`
+
+```{r}
+cor(datos$sleep_total, datos$awake)
+```
++ Wow!! Es casi perfecta negativamente. Las horas que estás dormido, son 24 - horas en las que estás despierto. Jejeje!! Descubrimos que el agua moja.
+
++ Podemos calcular la correlación de otro par de variables menos obvia
+
+```{r}
+cor(datos$sleep_rem, datos$sleep_cycle)
+```
++ Ohh!! Qué paso? Porqué me salió un NA? Porque alguna de las columnas tiene alguna o algunas entradas que son NA
+
++ Vamos a recordar una función que ya estudiamos en el módulo 2, para ver si tenemos NAs
+
+```{r}
+datos |> vis_dat()
+```
+
++ Este conjunto de datos, tiene un montón de NAs y es información que debemos considerar.
+
++ Vamor a intentar arreglar ese cálculo
+
+```{r}
+# En el cálculo sólo utiliza las parejas en las que ambas no son NA
+cor(datos$sleep_rem, datos$sleep_cycle, use = "pairwise.complete.obs")
+```
+
++ El mundo callejero usa la palabra "correlación" muy a la ligera para decir que dos variables estan relacionadas.
+
++ En DS/Matemáticas el término "correlación" significa el grado de relación LINEAL entre dos variables.
+
+
++ Hasta el momento, obtuvimos media, mediana, varianza, desvianción estándar para una sola columna. ¿Qué les parece si las obtenemos todas al mismo tiempo?
+
++ Vamos a utilizar la funcion skim de la librería {skim}
+
+```{r}
+resumen <- datos |> skimr::skim()
+
+resumen
+```
+
+```{r}
+resumen |> class()
+```
+```{r}
+resumen |> str()
+```
+
+```{r}
+resumen$skim_type
+```
+
++ ¿Qué tipo de datos trae mi dataset?
+
+```{r}
+resumen$skim_type |> unique()
+```
+
++ Si sólo me quiero quedar con la tablita de las numéricas. Ocupo la función yank
+
+```{r}
+datos |> skimr::skim() |> skimr::yank("numeric")
+```
+
+```{r}
+datos |> skimr::skim() |> skimr::yank("character")
+```
+
++ Me interesa tener la tabla resumen de columnas numéricas por que le quiero agregar y quitar cosas
+
++ Agregar: kurtosis, skewness
++ Quitar: hist, complete_rate
+
++ Puedo extraer sólo la tablita de las columnas "caracter"
+
+```{r}
+datos |> skimr::skim() |> skimr::yank("character")
+```
+
+```{r}
+resumen_numericas <- datos |> skimr::skim() |> skimr::yank("numeric")
+resumen_numericas
+```
+
++ Mi nuevo objetivo es ahora agregarle una columna que contenga la kurtosis y otra que contenga la skewness
+
++ Empecemos con la skewness:
+
+```{r}
+# Solo seleccionamos las columnas numéricas
+datos |> dplyr::select(where(is.numeric))
+```
+
+```{r}
+# Vamos a aplicar la función skewness a cada columna numérica
+# Esto esto se lo establecemos con el parámetro MARGIN = 2
+# Si quisieramos hacer la operación por renglones tendríamos que poner MARGIN = 1
+datos |> dplyr::select(where(is.numeric))|> 
+  apply(FUN = moments::skewness, na.rm = TRUE, MARGIN = 2)
+```
+
+```{r}
+datos |> dplyr::select(where(is.numeric))|> 
+  apply(FUN = moments::skewness, na.rm = TRUE, MARGIN = 2) |>
+  as.data.frame() |> tibble::rownames_to_column()
+```
+
++ Vamos a asignarlo a un objeto y cambiarle el nombre a la segunda columna que esta terrible
+
+```{r}
+df_skewness <- datos |> dplyr::select(where(is.numeric)) |>
+  apply(FUN = moments::skewness, na.rm = TRUE, MARGIN = 2) |> # Margin = 2 Haz el cálculo por columnas
+  as.data.frame() |> tibble::rownames_to_column()
+
+names(df_skewness) <- c("variable","skewness")
+```
+
+¿Qué es lo que obtengo?
+
+```{r}
+df_skewness
+```
+
++ ¿Cómo lo junto con el dataframe de resumen que ya tengo?
+
+```{r}
+resumen_numericas
+```
+
++ Pues con un join
+
+```{r}
+resumen_numericas <- resumen_numericas |>
+  dplyr::left_join(df_skewness, by = c("skim_variable" = "variable"))
+# En este caso df_skewness es la tabla de la derecha
+```
+
+```{r}
+resumen_numericas
+```
+
+
++ Haremos exactamente lo mismo con la kurtosis
+
+```{r}
+df_kurtosis <- datos |> dplyr::select(where(is.numeric)) |>
+  apply(MARGIN = 2, FUN = moments::kurtosis, na.rm = TRUE) |> # Sólo hice un cambio en FUN
+  as.data.frame() |> tibble::rownames_to_column()
+
+names(df_kurtosis) <- c("variable","kurtosis")
+```
+
+
+```{r}
+df_kurtosis
+```
+
+Ya sólo me faltaría juntar esta última columna
+
+```{r}
+resumen_numericas <- resumen_numericas |>
+  dplyr::left_join(df_kurtosis, by = c("skim_variable" = "variable"))
+# En este caso el dataframe derecho es df_kurtosis
+```
+
+```{r}
+resumen_numericas
+```
+
+Ya puedo quitarle las columnas que me estorban
+
+```{r}
+resumen_numericas <- resumen_numericas |>
+  dplyr::select(skim_variable, n_missing, mean:p100, skewness, kurtosis)
+# mean:p100 quiere decir que te quieres quedar con las columnas desde mean hasta p100
+```
+
++ ¿Cómo me quedó?
+
+```{r}
+resumen_numericas
+```
+
++ ¿Qué ventaja le ven a esta forma de obtener las caracteristicas numéricos (i.e. estos resúmenes descriptivos) mediante dataframes?
+
+1. Se lee más fácil
+2. No tuve dependencia con los nombres de las columnas del dataframe original
+
+```{r}
+# Puse en solo chuck todo lo que acabamos de hacer paso por paso
+
+resumen_numericas <- datos |> skimr::skim() |> skimr::yank("numeric")
+
+df_kurtosis <- datos |> dplyr::select(where(is.numeric)) |>
+  apply(MARGIN = 2, FUN = moments::kurtosis, na.rm = TRUE) |> # Sólo hice un cambio en FUN
+  as.data.frame() |> tibble::rownames_to_column()
+
+names(df_kurtosis) <- c("variable","kurtosis")
+
+df_skewness <- datos |> dplyr::select(where(is.numeric)) |>
+  apply(FUN = moments::skewness, na.rm = TRUE, MARGIN = 2) |> # Margin = 2 Haz el cálculo por columnas
+  as.data.frame() |> tibble::rownames_to_column()
+
+names(df_skewness) <- c("variable","skewness")
+
+resumen_numericas <- resumen_numericas |>
+  dplyr::left_join(df_kurtosis, by = c("skim_variable" = "variable"))
+
+resumen_numericas <- resumen_numericas |>
+  dplyr::left_join(df_skewness, by = c("skim_variable" = "variable"))
+
+resumen_numericas <- resumen_numericas |>
+  dplyr::select(skim_variable, n_missing, mean:p100, skewness, kurtosis)
+```
+
+```{r}
+resumen_numericas
+```
+
+¿Jalará con otro conjunto de datos?
+
++ Vamos a tomar otro conjunto de datos. Vamos a tomar el de los pingüinos
+
++ Includes measurements for penguin species, island in Palmer Archipelago, size (flipper length, body mass, bill dimensions), and sex.
+
++ A tibble with 344 rows and 8 variables
+
+```{r}
+palmerpenguins::penguins
+```
+
+
+```{r}
+datos <- palmerpenguins::penguins
+```
+
++ Copié y pegué el chunk dondo tiene todo lo que hicimos
+
+```{r}
+resumen_numericas <- datos |> skimr::skim() |> skimr::yank("numeric")
+
+df_kurtosis <- datos |> dplyr::select(where(is.numeric)) |>
+  apply(MARGIN = 2, FUN = moments::kurtosis, na.rm = TRUE) |> # Sólo hice un cambio en FUN
+  as.data.frame() |> tibble::rownames_to_column()
+
+names(df_kurtosis) <- c("variable","kurtosis")
+
+df_skewness <- datos |> dplyr::select(where(is.numeric)) |>
+  apply(FUN = moments::skewness, na.rm = TRUE, MARGIN = 2) |> # Margin = 2 Haz el cálculo por columnas
+  as.data.frame() |> tibble::rownames_to_column()
+
+names(df_skewness) <- c("variable","skewness")
+
+resumen_numericas <- resumen_numericas |>
+  dplyr::left_join(df_kurtosis, by = c("skim_variable" = "variable"))
+
+resumen_numericas <- resumen_numericas |>
+  dplyr::left_join(df_skewness, by = c("skim_variable" = "variable"))
+
+resumen_numericas <- resumen_numericas |>
+  dplyr::select(skim_variable, n_missing, mean:p100, skewness, kurtosis)
+```
+
+```{r}
+resumen_numericas
+```
+
++ Ohh!! Sí funcionó!!
+
++ Con las columnas categóricas es ligeramente más difícil de trabajar, y es porque en realidad de las categóricas, nos interesa en principio su relación con otras categoricas u otras continuas
+
+```{r}
+# Voy a ver alguna especie de relación de frecuencia entre
+# la alimentación (omni, carni, herbi, etc) con su estatus de conservación
+# Proporciones por renglón
+table(msleep$vore, msleep$conservation)
+```
+
+
+```{r}
+# Voy a ver alguna especie de relación de frecuencia entre
+# la alimentación (omni, carni, herbi, etc) con su estatus de conservación
+# Proporciones por renglón
+table(msleep$vore, msleep$conservation) |> proportions(margin = 1)
+```
+
+```{r}
+# Proporciones por columna:
+table(msleep$vore, msleep$conservation) |> proportions(margin = 2)
+```
+
+```{r}
+# Proporciones de un todo
+table(msleep$vore, msleep$conservation) |> proportions()
+```
+
+```{r}
+datos <- ggplot2::msleep
+```
+
+
+```{r}
+datos |> janitor::tabyl(vore, conservation) |>
+  janitor::adorn_totals("row")
+```
+
+```{r}
+datos |> janitor::tabyl(vore, conservation) |>
+  janitor::adorn_totals("col")
+```
+
+```{r}
+datos |> janitor::tabyl(vore, conservation) |> janitor::adorn_percentages("row") |>
+  janitor::adorn_pct_formatting(digits = 2) |>
+  janitor::adorn_ns()
+```
+```{r}
+datos |> janitor::tabyl(vore, conservation) |> janitor::adorn_percentages("col") |>
+  janitor::adorn_pct_formatting(digits = 2) |>
+  janitor::adorn_ns()
+```
+  
++ Sigo dependiendo mucho de los nombres de las columnas originales
+
++ Vamos a intentar resolverlo
+
+```{r}
+lista_conteos <- datos |> dplyr::select(where(is.character)) |>
+  apply(FUN = table, MARGIN = 2)
+```
+
+```{r}
+lista_conteos
+```
+en= endangered lc=least concern nt=near threatened vu=vulnerable cd= conservation dependent
+
+
+```{r}
+lista_conteos[[4]] |> data.frame() |> dplyr::arrange(desc(Freq))
+```
+
+```{r}
+lista_conteos[[2]] |> data.frame() |> dplyr::arrange(desc(Freq))
+```
+
++ Vamos a hacer unas graficas sencillas
+
+
+```{r}
+datos |> ggplot() +
+  geom_histogram(aes(x = sleep_total, y = ..density..),
+                 bins = 40, fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = sleep_total), color = "red", size = 0.5) +
+  theme_light()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_histogram(aes(x = sleep_total, y = ..density..),
+                 bins = 40, fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = sleep_total), color = "red", size = 0.5) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
+
+```{r}
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs") |> corrplot.mixed(order = 'AOE')
+```
+
+```{r}
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs")
+```
+
+```{r}
+# Correlación (Relación lineal de toda la vida)
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs", method = "pearson") |> corrplot.mixed(order = 'AOE')
+```
+
+```{r}
+# Correlación (Relación monótona)
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs", method = "spearman") |> corrplot.mixed(order = 'AOE')
+```
+
+
+```{r}
+datos |> ggplot() +
+  geom_point(aes(x = sleep_total, y = brainwt)) +
+  theme_light()
+```
+
+```{r}
+graf <- datos |> ggplot(aes(x = sleep_total, y = brainwt)) +
+  geom_point() +
+  theme_light()
+
+graf <- ggMarginal(graf, type = "histogram")
+```
+
+```{r}
+graf
+```
+
+```{r}
+graf <- datos |> ggplot(aes(x = sleep_total, y = brainwt, color = vore)) +
+  geom_point() +
+  theme_light()
+
+graf <- ggMarginal(graf, type = "histogram",
+                   groupColour = TRUE,
+                   groupFill = TRUE)
+```
+
+```{r}
+graf
+```
+
+
+```{r}
+datos |> ggplot() +
+  geom_point(aes(x = sleep_total, y = brainwt, color = vore)) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
+
+
+```{r}
+datos |> ggplot() +
+  geom_hex(aes(x = sleep_total, y = brainwt), bins = 20, color = "white") +
+  theme_light()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_hex(aes(x = sleep_total, y = brainwt), bins = 20) +
+  scale_fill_viridis_c() +
+  theme_light()
+```
+
+
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt))
+```
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt), binwidth = 0.04)
+```
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt), binwidth = 0.04) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt), binwidth = 0.05) +
+  facet_wrap(~conservation) +
+  theme_light()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_rem, y = brainwt), binwidth = 0.04) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_cycle, y = brainwt)) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_cycle, y = bodywt)) +
+  facet_wrap(~vore) +
+  theme_light()
+```
