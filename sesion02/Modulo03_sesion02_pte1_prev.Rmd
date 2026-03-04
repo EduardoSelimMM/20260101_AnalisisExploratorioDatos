@@ -1,0 +1,191 @@
+```{r}
+datos <- ggplot2::msleep
+```
+
+```{r}
+datos |> janitor::tabyl(vore, conservation) |>
+  janitor::adorn_totals("row")
+```
+
+```{r}
+datos |> janitor::tabyl(vore, conservation) |>
+  janitor::adorn_totals("col")
+```
+
+```{r}
+datos |> janitor::tabyl(vore, conservation) |> janitor::adorn_percentages("row") |>
+  janitor::adorn_pct_formatting(digits = 2) |>
+  janitor::adorn_ns()
+```
+```{r}
+datos |> janitor::tabyl(vore, conservation) |> janitor::adorn_percentages("col") |>
+  janitor::adorn_pct_formatting(digits = 2) |>
+  janitor::adorn_ns()
+```
+  
++ Sigo dependiendo mucho de los nombres de las columnas originales
+
++ Vamos a intentar resolverlo
+
+```{r}
+lista_conteos <- datos |> dplyr::select(where(is.character)) |>
+  apply(FUN = table, MARGIN = 2)
+```
+
+```{r}
+lista_conteos
+```
+en= endangered lc=least concern nt=near threatened vu=vulnerable cd= conservation dependent
+
+
+```{r}
+lista_conteos[[4]] |> data.frame() |> dplyr::arrange(desc(Freq))
+```
+
+```{r}
+lista_conteos[[2]] |> data.frame() |> dplyr::arrange(desc(Freq))
+```
+
++ Vamos a hacer unas graficas sencillas
+
+
+```{r}
+datos |> ggplot() +
+  geom_histogram(aes(x = sleep_total, y = ..density..),
+                 bins = 40, fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = sleep_total), color = "red", size = 0.5) +
+  theme_light()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_histogram(aes(x = sleep_total, y = ..density..),
+                 bins = 40, fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = sleep_total), color = "red", size = 0.5) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
+
+```{r}
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs") |> corrplot.mixed(order = 'AOE')
+```
+
+```{r}
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs")
+```
+
+```{r}
+# Correlación (Relación lineal de toda la vida)
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs", method = "pearson") |> corrplot.mixed(order = 'AOE')
+```
+
+```{r}
+# Correlación (Relación monótona)
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs", method = "spearman") |> corrplot.mixed(order = 'AOE')
+```
+
+
+```{r}
+datos |> ggplot() +
+  geom_point(aes(x = sleep_total, y = brainwt)) +
+  theme_light()
+```
+
+```{r}
+graf <- datos |> ggplot(aes(x = sleep_total, y = brainwt)) +
+  geom_point() +
+  theme_light()
+
+graf <- ggMarginal(graf, type = "histogram")
+```
+
+```{r}
+graf
+```
+
+```{r}
+graf <- datos |> ggplot(aes(x = sleep_total, y = brainwt, color = vore)) +
+  geom_point() +
+  theme_light()
+
+graf <- ggMarginal(graf, type = "histogram",
+                   groupColour = TRUE,
+                   groupFill = TRUE)
+```
+
+```{r}
+graf
+```
+
+
+```{r}
+datos |> ggplot() +
+  geom_point(aes(x = sleep_total, y = brainwt, color = vore)) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
+
+
+```{r}
+datos |> ggplot() +
+  geom_hex(aes(x = sleep_total, y = brainwt), bins = 20, color = "white") +
+  theme_light()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_hex(aes(x = sleep_total, y = brainwt), bins = 20) +
+  scale_fill_viridis_c() +
+  theme_light()
+```
+
+
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt))
+```
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt), binwidth = 0.04)
+```
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt), binwidth = 0.04) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt), binwidth = 0.05) +
+  facet_wrap(~conservation) +
+  theme_light()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_rem, y = brainwt), binwidth = 0.04) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_cycle, y = brainwt)) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_cycle, y = bodywt)) +
+  facet_wrap(~vore) +
+  theme_light()
+```
