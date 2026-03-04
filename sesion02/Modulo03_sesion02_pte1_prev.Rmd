@@ -1,3 +1,24 @@
+---
+title: "Sesión 2 - Parte 1"
+author: "Mi fabuloso nombre"
+date: "5 de marzo de 2026"
+output: html_document
+---
+
+```{r}
+library(ggplot2) # Visualizaciones
+library(ggExtra) # Visualizaciones
+library(corrplot) # Visualizaciones de la matriz de correlación
+library(dplyr) # Operaciones entre dataframes
+library(magrittr) # Algunos operadores de asignación %>%, <>
+library(palmerpenguins) # El dataset de los pingüinitos
+library(visdat) # Visualización de los datos faltantes
+library(skimr) # Para generer métricas
+library(janitor) # Para limpieza
+library(moments) # Calcular la kurtosis y la skewness
+library(hexbin) # Auxiliar para visualización
+```
+
 ```{r}
 datos <- ggplot2::msleep
 ```
