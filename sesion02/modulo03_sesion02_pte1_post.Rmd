@@ -1,0 +1,332 @@
+---
+title: "Sesión 2 - Parte 1"
+author: "Mi fabuloso nombre"
+date: "5 de marzo de 2026"
+output: html_document
+---
+
+```{r}
+library(ggplot2) # Visualizaciones
+library(ggExtra) # Visualizaciones
+library(corrplot) # Visualizaciones de la matriz de correlación
+library(dplyr) # Operaciones entre dataframes
+library(magrittr) # Algunos operadores de asignación %>%, <>
+library(palmerpenguins) # El dataset de los pingüinitos
+library(visdat) # Visualización de los datos faltantes
+library(skimr) # Para generer métricas
+library(janitor) # Para limpieza
+library(moments) # Calcular la kurtosis y la skewness
+library(hexbin) # Auxiliar para visualización
+```
+
++ Vamos a seguir trabajando en el dataset del sueño de los mamíferos
+
+```{r}
+datos <- ggplot2::msleep
+```
+
++ Vamos utilizar algunas de las funciones de la librería {janitor} par hacer algunos resúmenes... sobre variables categóricas
+
+```{r}
+# Tabla de contingencia
+# Frecuencia conjunta de dos variables nominales
+datos |> janitor::tabyl(vore, conservation) |>
+  janitor::adorn_totals("row")
+```
+
++ Por supuesto también lo podríamos hacer por columna
+
+```{r}
+datos |> janitor::tabyl(vore, conservation) |>
+  janitor::adorn_totals("col")
+```
+
+```{r}
+datos |> janitor::tabyl(vore, conservation) |> janitor::adorn_percentages("row") |>
+  janitor::adorn_pct_formatting(digits = 2) |>
+  janitor::adorn_ns()
+```
++ Esta representación por porcentajes nos permite tener una noción de las funciones de probabilidad conjunto $f_{X,Y}$, pero también de las funciones condicionales $f_{X|Y}$ o bien $f_{Y|X}$
+
++ Análogamente lo podemos hacer para columnas
+
+```{r}
+datos |> janitor::tabyl(vore, conservation) |> janitor::adorn_percentages("col") |>
+  janitor::adorn_pct_formatting(digits = 2) |>
+  janitor::adorn_ns()
+```
+  
++ Sigo dependiendo mucho de los nombres de las columnas originales. Eso hace que el código que escribimos no lo podamos "reciclar" para otro dataset diferente.
+
++ Es decir, no estamos pensando en un pipeline reproducible, más bien estamos haciendo un análisis de un solo uso.
+
++ Vamos a intentar resolverlo
+
++ Recordatorio la función table nos daba la tabla de frecuencias.
+
++ La voy a aplicar de golpe a todas las columnas de tipo string (categóricas)
+
+```{r}
+lista_conteos <- datos |> dplyr::select(where(is.character)) |>
+  apply(FUN = table, MARGIN = 2)
+```
+
+```{r}
+lista_conteos
+```
+
++ Las etiquetas de estatus de conservación significan esto:
+en= endangered lc=least concern nt=near threatened vu=vulnerable cd= conservation dependent
+
+```{r}
+lista_conteos |> class()
+```
++ Me dice que es una lista. Entonces mi éxito dependerá de que tan buenos somos para acceder a los elementos de una lista
+
++ Por ejemplo
+
+```{r}
+# Tomo el cuarto elemento de la lista, lo convierto en df y después lo ordeno
+# con respecto a la varioable Freq
+lista_conteos[[4]] |> data.frame() |> dplyr::arrange(desc(Freq))
+```
++ Lo mismo ocurre para la segunda entrada de la lista
+
+```{r}
+lista_conteos[[2]] |> data.frame() |> dplyr::arrange(desc(Freq))
+```
+
++ Vamos a hacer unas graficas sencillas para intentar entender la relación entre algunas variables
+
++ Empecemos con análisis univariados
+
+```{r}
+datos |> ggplot() +
+  geom_histogram(aes(x = sleep_total, y = ..density..),
+                 bins = 40, fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = sleep_total), color = "red", size = 0.5) +
+  theme_light()
+```
++ Vamos a intentar entender la relación de la alimentación con el sueño
+
+```{r}
+datos |> ggplot() +
+  geom_histogram(aes(x = sleep_total, y = ..density..),
+                 bins = 40, fill = "blue", alpha = 0.5) +
+  geom_density(aes(x = sleep_total), color = "red", size = 0.5) +
+  facet_wrap(~vore) + # Es la línea que agregué para hacer esta división por alimento
+  theme_light()
+```
+
++ Vamos obtener la matriz de correlación
+
+```{r}
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs") |> corrplot.mixed(order = 'AOE')
+```
+
++ Si quisiera no una representación gráfica, sino la matriz
+
+```{r}
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs")
+```
+
+```{r}
+# Correlación (de Kendall)
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs", method = "kendall") |> corrplot.mixed(order = 'AOE')
+```
+
+```{r}
+# Correlación (Relación monótona)
+datos |> dplyr::select(where(is.numeric)) |>
+  cor(use = "complete.obs", method = "spearman") |> corrplot.mixed(order = 'AOE')
+```
+
++ Como dijimos que puede ser que estén relacionadas el peso del cerebro con el sueño total vamos a hacer una grafiquita
+
+```{r}
+datos |> ggplot() +
+  geom_point(aes(x = sleep_total, y = brainwt)) +
+  theme_light()
+```
+
++ Medir las relaciones con correlación no nos da luz sobre relaciones no-lineales
+
+```{r}
+graf <- datos |> ggplot(aes(x = sleep_total, y = brainwt)) +
+  geom_point() +
+  theme_light()
+
+graf <- ggMarginal(graf, type = "histogram")
+```
+
+```{r}
+graf
+```
+
+```{r}
+graf <- datos |> ggplot(aes(x = sleep_total, y = brainwt, color = vore)) +
+  geom_point() +
+  theme_light()
+
+graf <- ggMarginal(graf, type = "histogram",
+                   groupColour = TRUE,
+                   groupFill = TRUE)
+```
+
+```{r}
+graf
+```
+
++ Esta visualización en su afán por querer usar las marginales, lo complica un poco
+
++ PEnsemos más sencillo
+
+```{r}
+datos |> ggplot() +
+  geom_point(aes(x = sleep_total, y = brainwt, color = vore)) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
+```{r}
+datos |> dplyr::filter(brainwt >= 2)
+```
+
+```{r}
+datos |> dplyr::filter(brainwt < 2) |> ggplot(aes(x = sleep_total,
+                                                   y = brainwt,
+                                                   color = vore)) +
+  geom_point() +
+  theme_light()
+```
+
++ Otra visualización que permite ver relación entre 2 variable es hexbin
+
+```{r}
+datos |> ggplot() +
+  geom_hex(aes(x = sleep_total, y = brainwt), bins = 20, color = "white") +
+  theme_light()
+```
+
++ Vamos a cambiarle la escala de color
+
+```{r}
+datos |> ggplot() +
+  geom_hex(aes(x = sleep_total, y = brainwt), bins = 20) +
+  scale_fill_viridis_c() + # Es una paleta de color estándar
+  theme_light()
+```
+
++ Hya una prima-hermana de esta gráfica
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt))
+```
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt), binwidth = 0.04)
+```
+
++ Puedo hacer esta misma gráfica pero ahora sólo por alimentación
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt), binwidth = 0.04) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_total, y = brainwt), binwidth = 0.05) +
+  facet_wrap(~conservation) +
+  theme_light()
+```
+
++ Vamos a ver ahora qué pasa con la relación entre el sueño rem y el cerebro
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_rem, y = brainwt), binwidth = 0.04) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
++ Vamos a ver esta misma relación con respecto al ciclo de sueño
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_cycle, y = brainwt)) +
+  facet_wrap(~vore) +
+  theme_light()
+```
++ Esta gráfica fue un fracaso
+
+```{r}
+datos |> ggplot() +
+  geom_density_2d(aes(x = sleep_cycle, y = bodywt)) +
+  facet_wrap(~vore) +
+  theme_light()
+```
+
++ Vamos a hacer un par más de gráficas para ver que se pueden obtener algunas conclusiones sólo de hacer un análisis gráfico
+
+```{r}
+datos <- palmerpenguins::penguins
+```
+
+```{r}
+datos
+```
+
+```{r}
+datos |> ggplot() + geom_point(aes(x= flipper_length_mm,
+                                   y = bill_length_mm))
+```
+
+```{r}
+datos |> ggplot() + geom_point(aes(x= flipper_length_mm,
+                                   y = bill_length_mm, color = species))
+```
+
+```{r}
+datos |> ggplot() + geom_point(aes(x= flipper_length_mm,
+                                   y = bill_length_mm, color = species)) +
+  facet_wrap(~island)
+```
+
+```{r}
+datos |> ggplot() + geom_point(aes(x= flipper_length_mm,
+                                   y = bill_length_mm,
+                                   color = species,
+                                   shape = sex)) +
+  facet_wrap(~island)
+```
+
+```{r}
+datos |> ggplot() + geom_point(aes(x= flipper_length_mm,
+                                   y = body_mass_g,
+                                   color = species,
+                                   shape = sex)) +
+  facet_wrap(~island)
+```
+
+```{r}
+datos |> ggplot() + geom_point(aes(x= flipper_length_mm,
+                                   y = body_mass_g,
+                                   color = species,
+                                   shape = island)) +
+  facet_wrap(~sex)
+```
+
+
+```{r}
+datos |> ggplot() + geom_point(aes(x= flipper_length_mm,
+                                   y = body_mass_g,
+                                   color = sex,
+                                   shape = island)) +
+  facet_wrap(~species)
+```
