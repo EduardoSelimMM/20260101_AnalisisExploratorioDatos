@@ -9,5 +9,7 @@
 + Sábado: 9:30 a 12:00 hrs. En línea
 
 ## Sesiones 
-- [Sesion 1: 3 de marzo de 2026](./sesion01)
-- [Sesion 2: 5 de marzo de 2026](./sesion02)
+- [Sesion 1: 3 de marzo de 2026](./sesion01): 18:00 a 20:00 hrs. Google Meet
+- [Sesion 2: 5 de marzo de 2026](./sesion02): 18:00 a 20:30 hrs. Googe Meet
+- [Sesion 3: 7 de marzo de 2026](./sesion03): Sesión asíncrona
+- [Sesion 4: 10 de marzo de 2026](./sesion04): 18:00 a 20:00 hrs. Google Meet
