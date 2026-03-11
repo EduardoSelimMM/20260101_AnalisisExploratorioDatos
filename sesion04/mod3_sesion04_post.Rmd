@@ -1,0 +1,496 @@
+---
+title: "Sesión 04"
+author: "Nombre del estudiante"
+date: "10 de marzo de 2026"
+output: html_document
+---
+
++ Vamos a revisar otra librería que nos permite hacer diagnósticos en nuestros datos de manera relativamente sencilla
+
+# La librería {dlookr}
+
+```{r}
+#install.packages("dlookr")
+```
+
+
+```{r}
+library(dplyr) # Manipulación de DFs
+library(dlookr) # Reportes rápidos y sencillos
+library(ggplot2) # Para graficación
+```
+
++ La librería {dlookr} tiene funciones de diagnóstico, descripción y generación de reportes para facilitar el EDA (Exploratory Data Analysis) de un conjunto de datos.
+
++ Esta "facilidad" también hace que no se puedan personalizar mucho los reportes pero qué le vamos a hacer?
+
++ Una de sus ventajas es que es compatible con los verbos de la librería {dplyr}
+
++ Es una alternativa, un poco más estandarizada, a la librería {skimr}
+
++ De hecho, está pensada para científicos usuarios de la estadística, no **necesariamente estadísticos**
+
++ Es una manera muy elegante de decir, que esta librería está obsesionada con la distribución normal (gaussiana). Para esta librería, los datos deberían verse normales a toda costa.
+
++ Empecemos de a poco con nuestro conjunto de los pingüinitos
+
+```{r}
+datos <- palmerpenguins::penguins
+head(datos)
+```
+
++ Empezaremos con la función `diagnose()`
+
+```{r}
+datos |> dlookr::diagnose()
+```
+
++ Ésta nos ayuda a entender cuántas y cuáles variables tenemos, de qué tipo son cada una, el porcentaje de NAs; y en caso de las variables categóricas, cuántas categorías tiene cada variable
+
++ Podemos ser más precisos, si hacemos el análisis para numéricas y categóricas por separado
+
++ Puedo diagnosticar sólo las numéricas
+
+```{r}
+datos |> dlookr::diagnose_numeric()
+```
+
++ Acá son importantes las columnas `zero` y `minus`. `outlier` nos da el conteo de cuántas observaciones (celdas) tienen el valor 0 y `minus` cuántas celdas tienen signo negativo. Cuantas celdas son outliers bajo de el criterio de la librería (recuerde que esto es subjetivo)
+
++ ¿Porqué será importante esto?
+
++ El `minus` nos dice si hay algún dato que debería aparecer con ese signo, por ejemplo si la columna representa edad, ingreso, o una cantidad intrínsecamente positiva. Es para verificar si hubo algún error de captura o de lectura de los datos.
+
++ El `zero` nos ayuda a entender si quien codificó el dataset, se le ocurrió intercambiar 0s por NAs.
+
++ Podemos hacer el diagnóstico, sólo para las categóricas
+
+```{r}
+datos |> dlookr::diagnose_category()
+```
+
++ El ratio simplemente es freq/N
+
++ El rank ordena las categorías por frecuencia y las ordena de mayor a menor
+
++ La librería también nos ayuda a detectar outliers (por supuesto, sólo en las variables numéricas) bajo el critero de la librería.
+
+```{r}
+datos |> dlookr::diagnose_outlier()
+```
+
+```{r}
+otros_datos <- ggplot2::msleep
+otros_datos |> head()
+```
+
++ Vamos a aplicar las funciones de diagnóstico a este otro dataset
+
+```{r}
+otros_datos |> dlookr::diagnose_numeric()
+```
+
+```{r}
+otros_datos |> dlookr::diagnose_outlier()
+```
+
++ La columna `with_mean` nos da el promedio considerando los outliers
+
++ La columna `without_mean` nos da el promedio SIN considerar los outliers
+
++ Pregunta pendiente: ¿Cómo define esta librería qué es un outlier?
+
++ Una propiedad bonita de esta librería es que funciona bien con los verbos del dplyr, en particular con el gruop_by
+
++ Vamos a hacer un diagnóstico de los datos, pero ahora por especie: Gentoo, Adelie y Chinstrap
+
+```{r}
+datos |> dplyr::group_by(species) |> dlookr::diagnose()
+```
+
+```{r}
+datos |> dplyr::group_by(species) |> dlookr::diagnose_numeric()
+```
+```{r}
+otros_datos |> dplyr::group_by(vore) |> dlookr::diagnose_numeric()
+```
+
++ Tiene una representación tipo Pareto (80-20) que nos ayuda a identificar cómo nos afectan los NAs
+
+```{r}
+datos <- palmerpenguins::penguins
+```
+
+
+```{r}
+#datos |> dlookr::plot_na_pareto(col = "blue")
+```
+
++ También tenemos una función para intentar diagnisticar si la ocurrencia de NAs tiene alguna relación con las otras variables
+
+```{r}
+library(dlookr)
+```
+
+
+```{r}
+datos |> plot_na_hclust(main = "Distribución de los valores faltantes")
+```
+
++ No luce interesante, i.e. no hay alguna relación entre los NAs del sexo y las otras variables.
+
++ Vamos a intentar cono otro dataset
+
+```{r}
+library(ggplot2)
+```
+
+
+```{r}
+otros_datos <- ggplot2::msleep
+```
+
+```{r}
+otros_datos |> plot_na_hclust(main = "Distribución de los valores faltantes")
+```
+
++ Aunque el diagnóstico para un conjunto de datos pareciera una análisis de los datos, formalmente NO lo es. Es un análisis de los metadatos (que incluye cierto análisis de los datos en sí mismos)
+
++ Para hacer un "análisis" usaremos la función `describe()`
+
+```{r}
+datos |> dlookr::describe()
+```
+
+```{r}
+otros_datos |> dlookr::describe()
+```
+
++ Nos permite calcular métricas de centro (media y mediana), de dispersión (desviación estándar y error estándar, IQR, min y max) y de localización (cuantiles) para las variables numéricas.
+
++ También podemos hacer esta descripción más detallada en función de alguna de las variables categóricas
+
+```{r}
+datos |> dplyr::group_by(species) |> dlookr::describe()
+```
++ Esta es la versión aburrida de las gráficas que hicimos la semana pasada
+
++ La variable año es una variable "incómoda" aunque tiene representación numérica, la podriamos considerar como categórica
+
+```{r}
+datos |> head()
+```
+
+
+```{r}
+# Vamos a cambiar a year por categórica
+datos |> dplyr::mutate(year = as.factor(year)) |> dplyr::group_by(species) |> dlookr::describe()
+```
++ Ya que year es categórica hecha y derecha, podemos hacer el análisis a traves de ella
+
+```{r}
+datos |> dplyr::mutate(year = as.factor(year)) |> dplyr::group_by(year) |> dlookr::describe()
+```
+
++ Incluso lo podemos hacer aún más fino, i.e. con respecto a dos variables categóricas: año y especia
+
+```{r}
+datos |> dplyr::mutate(year = as.factor(year)) |> 
+  dplyr::group_by(species, year) |> 
+  dlookr::describe()
+```
+
++ Creo que es más interesante una cosa de este estilo. Era quizá más interesante la relación con la isla
+
+```{r}
+datos |> dplyr::group_by(species, island) |> dlookr::describe()
+```
+
++ O también,
+
+```{r}
+datos |> dplyr::group_by(sex, species) |> dlookr::describe()
+```
+
+
++ Una de las funciones que gusta mucho a los usuarios de la estadística es el de "verificar si una columna (numérica) es normal o no"
+
++ Lo que hace es realizar la prueba Shapiro-Wilk para probar normalidad (gaussianidad)
+
++ Vamos a convertir el año el año en categórica para que no nos estorbe
+
+```{r}
+datos |> dplyr::mutate(year = as.factor(year)) |> dlookr::normality()
+```
+
++ Con una significancia del 99% las que NO son normales son
+
+```{r}
+datos |> dplyr::mutate(year = as.factor(year)) |> dlookr::normality() |> dplyr::filter(p_value <= 0.01)
+```
+
++ Ups!! En este caso ninguna de las variables numéricas es normal :(
+
++ De hecho, podemos ver graficamente su relación con la normal
+
+```{r}
+datos |> dplyr::mutate(year = as.factor(year)) |> dlookr::plot_normality()
+```
+
++ Sólo por curiosidad, apliquemos estas funciones de normalidad, al dataset del sueño
+
+```{r}
+otros_datos |> head()
+```
+
+
+```{r}
+otros_datos |> dlookr::normality() |> dplyr::filter(p_value <= 0.01)
+```
+
+```{r}
+otros_datos |> dlookr::normality() |> dplyr::filter(p_value > 0.01)
+```
+
+```{r}
+otros_datos |> dlookr::plot_normality()
+```
+
++ También puedo obtener la correlación, con un formato menos redundante que con la matriz de correlaciones. No en forma matricial, sino en forma de un dataframe
+
+```{r}
+datos |> dlookr::correlate()
+```
+
++ Por supuesto, también se puede hacer una visualización
+
+```{r}
+datos |> dplyr::mutate(year = as.factor(year)) |>
+  dlookr::correlate() |> plot()
+```
+
+
+```{r}
+otros_datos |> dlookr::correlate() |> plot()
+```
+
+
++ Por supuesto, también puedo obtener la correlación condicionada a los valores de una variable categórica
+
+```{r}
+datos |> dplyr::group_by(species) |> dlookr::correlate()
+```
+
+```{r}
+datos |> dplyr::mutate(year = as.factor(year)) |> 
+  dplyr::group_by(species) |> 
+  dlookr::correlate() |> plot()
+```
+
+```{r}
+otros_datos |>
+  dplyr::group_by(vore) |> 
+  dlookr::correlate() |> plot()
+```
+
++ De nuevo en el de los pingüinos. Si agrupo por isla, ¿algunas correlaciones serán mas evidentes¿
+
+```{r}
+datos |>  dplyr::mutate(year = as.factor(year)) |> 
+  dplyr::group_by(island) |> 
+  dlookr::correlate() |> plot()
+```
+
+## Uso de la librería {dlookr} con un dataset un poquito más grande
+
++ Usaremos el dataset de NHANES
+
+```{r}
+datos <- NHANES::NHANES
+```
+
+```{r}
+dim(datos)
+```
++ Es un dataset de 10,000 renglones y 76 columnas.
+
++ Claramente, no puedo hacer un análisis una columna a la vez. Tengo que hacerlo de manera optimizada
+
+```{r}
+head(datos)
+```
+
++ Inocentemente, podemos querer diagnosticar este dataset
+
+```{r}
+datos |> dlookr::diagnose()
+```
+
+```{r}
+datos |> dlookr::diagnose_numeric()
+```
+
+```{r}
+datos |> dlookr::diagnose_category()
+```
+
+```{r}
+datos |> dlookr::diagnose_outlier()
+```
+
++ Vemos que la variable `Height` tiene algunos outliers
+
+```{r}
+datos |> dlookr::plot_outlier(Height) 
+```
+
+```{r}
+datos |> dplyr::group_by(Gender) |> dlookr::plot_outlier(Height) 
+```
+
++ No pasó nada
+
+```{r}
+datos |> dlookr::describe()
+```
++ De nuevo, veamos cómo se comportan los faltantes  
+
+```{r}
+datos |> dlookr::plot_na_pareto(col = "blue")
+```
+
+```{r}
+datos |> plot_na_hclust(main = "Distribución de los valores faltantes")
+```
+
++ Son tantas columnas que le costó trabajo
+
++ Vamos con la normalidad
+
+```{r}
+datos |> dlookr::normality()
+```
++ Las que de plano no son normales
+
+```{r}
+datos |> dlookr::normality() |> dplyr::filter(p_value <= 0.01)
+```
++ Las que sí son normales
+
+```{r}
+datos |> dlookr::normality() |> dplyr::filter(p_value > 0.01)
+```
+
+```{r}
+datos |> dlookr::correlate()
+```
+
+```{r}
+datos |> dlookr::correlate() |> plot()
+```
+
+```{r}
+datos |> dlookr::plot_normality()
+```
++ Ninguna de las que alcanzó a dibujar, es normal
+
++ Regresaremos a este dataset la siguiente clase para limpiarlo y hacer algunas hipótesis
+
+## Uso de la librería con un dataset mediano
+
+```{r}
+datos <- nasaweather::glaciers
+
+datos |> head()
+```
+
++ Veamos cuántos glaciares hay por país
+
+```{r}
+datos |> group_by(country) |> summarise(conteo = n())
+```
+RB: Bolivia y/o Botswana
+
+```{r}
+datos |> dlookr::diagnose()
+```
+
++ El área está codificada en formato string, cuando debiese ser numérica
+
+```{r}
+datos |> dplyr::select(area)
+```
+
++ Vamos a convertirla en numérica
+
+```{r}
+datos <- datos |> dplyr::mutate(area = as.numeric(area))
+```
+
+```{r}
+datos |> dlookr::diagnose()
+```
+
+
+```{r}
+datos |> dlookr::diagnose_numeric()
+```
+
+```{r}
+datos |> dplyr::select(-id, -name) |> dlookr::diagnose_category()
+```
+
+```{r}
+datos |> dlookr::describe()
+```
+
+```{r}
+datos |> dplyr::group_by(country) |> dlookr::describe(area)
+```
+
+
+
+```{r}
+datos <- nasaweather::atmos
+
+datos |> head()
+```
+
+```{r}
+datos |> ggplot() +
+  geom_point(aes(x = long, y = lat))
+```
+
+```{r}
+subdatos <- datos |> dplyr::select(surftemp:cloudhigh)
+head(subdatos)
+```
+
+
+```{r}
+subdatos |> diagnose_numeric()
+```
+
+```{r}
+subdatos |> describe()
+```
+
+```{r}
+subdatos |> dlookr::plot_na_pareto(col = "blue")
+```
+
+```{r}
+subdatos |> dlookr::plot_normality()
+```
+
+```{r}
+subdatos |> dlookr::diagnose_outlier()
+```
+
+```{r}
+subdatos |> dlookr::plot_outlier()
+```
+
+```{r}
+subdatos |> dlookr::correlate() |> plot()
+```
