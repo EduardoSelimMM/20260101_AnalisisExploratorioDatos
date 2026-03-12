@@ -1,0 +1,456 @@
+---
+title: "Sesión 5"
+author: "Tu nombre"
+date: "12 de marzo de 2026"
+output: html_document
+---
+
++ La sesión del martes revisamos la librería {dlookr}. Facilita el diagnóstico de variables: existencia de NAs, outliers, normalidad, medidas de tendencia central, medidas de desviación y todas éstas también por grupos de alguna o algunas variables categóricas.
+
+# Algunas herramientas para validación de datos
+
++ Hoy trabajaremos con la librería {validate} que nos ayuda a ir estableciendo reglas que deben cumplir nuestros datos
+
++ Esta pensada para análisis que no se hacen sólo una vez, sino que son análisis que se realizan frecuentemente
+
+```{r}
+library(dplyr) # manejo y operaciones entre dataframes
+library(validate) # librería que revisaremos hoy
+library(ggplot2) # librería para graficación
+library(fivethirtyeight) # librería para obtener algunos datasets
+```
+
++ La librería {validate} tiene el objetivo de facilitar la verificación de datos, haciéndola **mantenible** y **reproducible**.
+
++ Es decir, está pensada para formar parte de un **pipeline** de ciencia de datos, en el que se hace data aquisition de manera frecuente.
+
++ Evalua datos con respecto a un conjunto **reutilizable** de reglas de validación.
+
++ Analiza, resume y visualiza los resultados de la validación de datos.
+
++ Importa y exporta conjuntos de reglas desde y hacia varios formatos.
+
++ Filtra, selecciona y manipula reglas de validación de datos.
+
++ Analiza, resume y visualiza diferentes conjuntos de reglas.
+
++ Si se fijan, he utilizado la palabra "reglas" demasiadas veces; porque justamente es el corazón de las funciones de esta librería.
+
++ Como ejemplo, empezaremos a trabajar con el dataset de los pingüinos
+
+```{r}
+datos <- palmerpenguins::penguins
+datos |> head()
+```
+
++ Dijimos que el corazón de esta librería se basa en la creación de reglas.
+
++ Son reglas que indican LO QUE ESPERAMOS DE UN DATASET, en términos de tipo de datos, rango de datos... dependiendo lo que se nos "prometió".
+
++ Supongamos que el ingeniero de datos de mi organización, después de recolectar la informción me dijo que los datos deben tener las siguientes características:
+
+1. Todas las mediciones de las alas de los pingüinos es al menos de 185 mm
+2. No había ningún NA, al menos en la columna de longitud del pico
+3. Siempre se satisface que la longitud del pico es menor a 1.5 veces la anchura del pico
+4. Todos los datos de las alas son extrañamente menores a la media que se espera
+
+¿Le creemos?
+
++ Para evaluar si nos está mintiendo o no, ocuparemos la función `validator`.
+
++ Esta función recibe condiciones que derivan en valores lógicos (TRUE/FALSE)
+
+```{r}
+reglas <- validate::validator(flipper_length_mm >= 185, #1
+                              !is.na(bill_length_mm), #2
+                              bill_length_mm/bill_depth_mm <= 1.5,#3 
+                              flipper_length_mm <= mean(flipper_length_mm,
+                                                        na.rm = TRUE)) #4 
+```
+
++ Si voy al panel de variables del entorno en RStudio me dice que el objeto `reglas` es del tipo "Object containing active binding"
+
++ ¿Qué significa eso?
+
+```{r}
+reglas |> str()
+```
++ Una vez que yo defino las reglas, me dispongo a validar que efectivamente el dataset que me pasaron cumple esas reglas o no, i.e. si hay alguna discrepancia con respecto a lo que me prometieron
+
++ Aplicaré la función `confront`
+
+```{r}
+validate::confront(dat = datos, x = reglas)
+```
+
++ Vamos a analizar un poco más ese objeto
+
+```{r}
+validacion <- validate::confront(datos, reglas)
+validacion |> str()
+```
+
++ Me regresa un montón de info que es dificil de entender. Afortunadamente tiene un método de summary
+
+```{r}
+validacion |> summary()
+```
++ Haré una visualización de qué tanto incumple las expectativas este dataset
+
+```{r}
+validacion |> plot()
+```
+
++ Con la función violating, obtenemos cuáles son las observaciones que incumplen con las expectativas
+
++ Cuáles observaciones incumplen la regla 4 (ser menor a la media)
+
+```{r}
+validate::violating(datos, validacion[4])
+```
+
++ Tu investigador decider si las dejas, si las quitas, si son muchas, si son pocas, si no harás nada hasta que las "arreglen" (cumplan lo prometido)
+
++ Cuáles son las observaciones que incumplen las reglas 1, 2 y 3
+
+```{r}
+validate::violating(datos, validacion[1:3])
+```
++ Ouch!!! En este caso es todo el dataset. O se arregla el proceso de data acquisition o corriges la regla que me diste
+
++ Podemos ver que celdas fallaron en la validación
+
+```{r}
+validacion |> values()
+```
+
+```{r}
+validacion |> as.data.frame()
+```
++ Supongamos que el mismo ingeniero, me prometió que en la columna `sex` sólo es posible que venga "male" o "females", también me promtió que la columna de año siempre tiene 4 dígitos y finalmente me prometio que la columna de masa corporal es un flotante con dos cifras decimales
+
++ Voy a crear un nuevo conjunto de reglas, para ver si me están mintiendo o no
+
+```{r}
+otras_reglas <- validate::validator(field_format(sex, "*male"),
+                                    number_format(year, format="dddd"),
+                                    number_format(body_mass_g, format="d.dd"))
+```
+
++ De nuevo, voy a verificar si se cumplen esas reglas o no
+
+```{r}
+otra_validacion <- validate::confront(datos, otras_reglas)
+```
+
++ Veré qué tan bien se cumplen dichas reglas
+
+```{r}
+otra_validacion |> summary()
+```
++ La regla 3, la del formato de la masa corporal, no se cumple en ninguna observación... eso quiere decir que me mintió el ingeniero... él sabrá si revisa su proceso de data acquisition o me cambia la regla
+
+```{r}
+datos |> dplyr::select(body_mass_g) |> head()
+```
+
+
+```{r}
+otra_validacion |> plot()
+```
+
++ Podemos ver quienes incumplieron cada regla
+
+```{r}
+# Regla 1: male o female
+validate::violating(datos, otra_validacion[1])
+```
+
++ Claro!! Son NAs!!
+
+```{r}
+# Regla 2: Formato del year
+validate::violating(datos, otra_validacion[2])
+```
+
++ Efectivamente, nadie incumplió la regla
+
+```{r}
+# Regla 3: Formato de la masa corporal
+validate::violating(datos, otra_validacion[3])
+```
+
++ Sólo por curiosidad, veamos cómo son los formatos del año
+ 
+```{r}
+datos |> dplyr::select(year) |> unique()
+```
++ Algunos ejemplos de otros formatos son:
+
++ `format = "0.dddd"` -> "0.4321" sí cumple, pero "0.123","1.4563" no.
++ `format = "d.ddEdd"` -> "3.14E00" sí cumple, pero "31.14E00" no.
++ `format = "d.*Edd"` -> "0.314E01" y "3.1415297E00" sí cumplen, pero "3.1415230" no.
++ `format = "d.dd*"` -> "1.23" y "1.234" sí cumplen, pero "1.2" no.
+
++ Supongamos que ese mismo ingeniero me promete que la columna de la longitud de la ala siempre tiene más de dos caracteres, también me promete que la anchura del pico tiene formato de dos digitos - punto decimal - dos digitos. Además me dice que sólo me está dando datos del 2008 y 2009
+
++ ¿Me estará engañando?
+
+```{r}
+mas_reglas <- validate::validator(nchar(as.character(flipper_length_mm)) >= 2,
+                                  field_length(flipper_length_mm, n = 3),
+                                  number_format(bill_depth_mm, format="dd.dd"),
+                                  in_range(year, min=2008, max=2009))
+mas_validacion <- validate::confront(datos, mas_reglas)
+mas_validacion |> summary()
+```
+
+```{r}
+mas_validacion |> plot()
+```
+
++ Veamos quienes incumplen cada regla
+
+```{r}
+# Regla 1
+validate::violating(datos, mas_validacion[1])
+```
+
+```{r}
+# Regla 3
+validate::violating(datos, mas_validacion[3])
+```
+
+### Pequeña observación
+
++ Antes ocupamos la función `in_range` para verificar que alguna columna tuviera datos numéricos en cierto rango.
+
++ Esta función también detecta algunos patrones numéricos
+
++ Crearé un dataset para ejemplificar esto
+
+```{r}
+anios_q <- c("2024Q1", "2024Q2", "2024Q3", "2024Q4",
+             "2025Q1", "2025Q2", "2025Q3", "2025Q4")
+set.seed(1234)
+x <- runif(8)*1000
+ventas <- signif(x, digits = 5)
+ventas2 <- round(x, digits = 4)
+df_ventas <- data.frame(periodo = anios_q,
+                        ventas = ventas, ventas_exac = ventas2)
+df_ventas
+```
++ Supongamos que me prometieron datos del Q3 y Q4 del 2024 y del Q1 y Q2 del 2025... También puedo usar la función in_range. También se me dijo que las ventas no pueden ser menores de 50 ni mayores a 232.6
+
+```{r}
+reglas <- validate::validator(in_range(periodo, min="2024Q3", max="2025Q2"), #1
+                              in_range(ventas_exac, min=50, max=232.6)) #2
+# Haré la validación con mi df_ventas
+validacion <- validate::confront(df_ventas, reglas)
+validacion |> summary()
+```
+
+```{r}
+validacion |> plot()
+```
+
+```{r}
+# Quienes incumplen la regla 1 (fechas)
+validate::violating(df_ventas, reglas[1])
+```
+
+```{r}
+# Quienes incumplen la regla 2 (ventas > 50 y < 232.6)
+validate::violating(df_ventas, reglas[2])
+```
+
++ Ya se habrán dado cuenta que mi memoria es mala y a veces no recuerdo ni cuales son las reglas que definí... Les puedo poner un nombre (no somos protistas)
+
+```{r}
+reglas <- validate::validator(regla_quarter = in_range(periodo, min="2024Q3",
+                                                       max="2025Q2"),
+                              regla_rango_ventas = in_range(ventas_exac,
+                                                            min=50, max=232.6))
+# Haré la validación con mi df_ventas
+validacion <- validate::confront(df_ventas, reglas)
+validacion |> summary()
+```
++ También se entiende un poco mejor la gráfica
+
+```{r}
+validacion |> plot()
+```
+
+También puedo acceder de manera más "sencilla" a los elementos que inclumplen cierta regla
+
+```{r}
+# Quienes incumplen la regla 2 (ventas > 50 y < 232.6)
+validate::violating(df_ventas, reglas['regla_quarter'])
+```
+
+## Otro ejemplo...
+
++ Vamos a considerar un dataset que contiene info de los avengers (Marvel)
+
++ Este conjunto de datos viene en la librería {fivethirtyeight}
+
++ Demosle un vistazo a esos datos
+
+```{r}
+datos <- fivethirtyeight::avengers
+head(datos)
+```
+
++ Como yo soy un "purista" de los comics (y al parecer también machista y tonto), considero sólo valida la información que viene de la página oficial, que tienen un nombre y que son hombres
+
+```{r}
+reglas <- validate::validator(regla_url = field_format(url, "http://marvel.wikia*"),
+                              regla_nombre_real = !is.na(name_alias),
+                              regla_genero = gender == "MALE")
+validacion <- validate::confront(datos, reglas)
+validacion |> summary()
+```
+
+```{r}
+validacion |> plot()
+```
+
++ Veamos quienes incumplen las reglas
+
+```{r}
+validate::violating(datos, reglas['regla_genero'])
+```
+
+```{r}
+validate::violating(datos, reglas['regla_nombre_real'])
+```
+
++ Viene alguien más purista todavía y dice que sólo se valen los personajes que se consideran en todos las épocas/comics
+
+```{r}
+regla_verdadero_personaje <- validate::validator(regla_full = honorary == "Full")
+validacion_verdadero_personaje <- validate::confront(datos, regla_verdadero_personaje)
+validacion_verdadero_personaje |> summary()
+```
+
+```{r}
+validacion_verdadero_personaje |> plot()
+```
+
++ ¿Quienes incumplen la regla?
+
+```{r}
+validate::violating(datos, regla_verdadero_personaje['regla_full'])
+```
+
+Puedo juntar las reglas de estos personajes "puristas", "sumándolas"
+
+```{r}
+todas_mis_reglas <- regla_verdadero_personaje + reglas
+todas_mis_reglas
+```
+
+```{r}
+validacion_purista <- validate::confront(datos, todas_mis_reglas)
+validacion_purista |> summary()
+```
+
+```{r}
+validacion_purista |> plot()
+```
+
+```{r}
+validate::violating(datos, todas_mis_reglas['regla_genero'])
+```
+
+```{r}
+validate::violating(datos, todas_mis_reglas["regla_full"])
+```
++ Es una manera sencilla de combinar reglas que provienen de dos personas
+
++ Hace ratito me dijo Lalo que la función in_range podía detectar ciertos patros... veamos si acá tmb
+
+```{r}
+tail(datos)
+```
+
++ Parece que la columna `full_reserve_avengers_intro` trae meses y años juntos... veamos si funciona la función `in_range`
+
+```{r}
+reglas2 <- validate::validator(regla_calendario =in_range(full_reserve_avengers_intro,
+                                                          min="Nov-88", max="Sep-92"))
+validacion2 <- validate::confront(datos, reglas2)
+validacion2 |> summary()
+```
+
++ Al parecer no funcionó porque ningún renglón la pasó.
+
++ Al parecer hay algunos datos de esa columna que tienen formato "mes-año" y otros "año-mes"
+
++ Crearemos otra regla para intentar solucionarlo
+
+```{r}
+reglas3 <- validate::validator(regla_empieza_num = grepl("^[0-9]",
+                                                         full_reserve_avengers_intro))
+validacion3 <- validate::confront(datos, reglas3)
+validacion3 |> summary()
+```
+
+```{r}
+# Quienes incumplen esta regla
+validate::violating(datos, reglas3["regla_empieza_num"])
+```
++ Vamos a quitarlas del dataset para ver si así lo "arreglamos"
+
+```{r}
+fechas_malvadas <- validate::violating(datos, reglas3["regla_empieza_num"]) |>
+  dplyr::select(full_reserve_avengers_intro) |>
+  unique() |> pull()
+
+fechas_malvadas
+```
+
++ Me quedaré sólo con las que tienen "buen formato"
+
+```{r}
+datos_buen_formato <- datos |> 
+  dplyr::filter(!(full_reserve_avengers_intro %in% fechas_malvadas))
+
+datos_buen_formato
+```
++ Veamos si la función in_range ya me regresa algo que tenga sentido
+
+```{r}
+reglas2 <- validate::validator(in_range(full_reserve_avengers_intro,
+                                        min="5-Mar", max="10-May"))
+validacion2 <- validate::confront(datos_buen_formato, reglas2)
+validacion2 |> summary()
+```
+
++ La función in_range, no funciona siempre (como en el caso de los años-quarters de arriba)
+
+## Construcción y validación de nuevas variables
+
+```{r}
+datos <- palmerpenguins::penguins
+
+head(datos)
+```
+
+```{r}
+mi_indicador <- validate::indicator(
+  BMI = (bill_length_mm/2.2046)/(bill_depth_mm*0.0254)^2,
+  coef_variacion_ala = sd(flipper_length_mm)/mean(flipper_length_mm),
+  anchura_media_pico  = mean(bill_depth_mm, na.rm = TRUE),
+  indice_loco  = sum(bill_length_mm,na.rm = TRUE)/year,
+  indice_mas_loco = body_mass_g/nchar(as.character(species)))
+```
+
+```{r}
+validacion <- validate::confront(datos, mi_indicador)
+validacion |> summary()
+```
+
+```{r}
+add_indicators(datos, validacion)
+```
