@@ -13,3 +13,4 @@
 - [Sesion 2: 5 de marzo de 2026](./sesion02): 18:00 a 20:30 hrs. Googe Meet
 - [Sesion 3: 7 de marzo de 2026](./sesion03): Sesión asíncrona
 - [Sesion 4: 10 de marzo de 2026](./sesion04): 18:00 a 20:00 hrs. Google Meet
+- [Sesion 5: 12 de marzo de 2026](./sesion05): 18:00 a 20:30 hrs. Google Meet
