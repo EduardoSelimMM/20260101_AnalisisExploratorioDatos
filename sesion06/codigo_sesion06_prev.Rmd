@@ -1,0 +1,356 @@
+---
+title: "Sesión 6"
+author: "Tu nombre"
+date: "14 de marzo de 2026"
+output: html_document
+---
+
+# ... Continuación de EDA
+
++ La sesión de hoy, revisaremos dos librerías más {funModeling} y {SmartEDA} que tienen funciones para agilizar el EDA
+
++ Ni estas dos librerías ni la de {dlookr} tienen todas las funciones que nos gustarían... así que ocuparemos las 3
+
+```{r}
+library(funModeling)
+library(SmartEDA)
+
+library(Hmisc)
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+library(ggplot2movies)
+library(palmerpenguins)
+```
+
++ Vamos a trabajar varios varios conjuntos de datos... empecemos simples con el de los pingüinos
+
+```{r}
+datos <- palmerpenguins::penguins
+```
+
++ Más adelante, trabajaremos con los de vuelos de NY en diferentes categorías
+
+```{r}
+df_aerolineas <- nycflights13::airlines
+df_aeropuertos <- nycflights13::airports
+df_aviones <- nycflights13::planes
+df_clima <- nycflights13::weather
+df_vuelos <- nycflights13::flights
+```
+
++ Estas tablas son muy parecidas a las que tienen en alguno de sus proyectos
+
++ La primera primera función que veremos es `status`
+
+```{r}
+funModeling::status(datos)
+```
++ Esta función incluye la columna de "número de infinitos" (i.e. un número gigantesco que tiene su propio tipo "inf"), que las anteriores librerías no incluían.
+
++ La segunda función `data_integrity`
+
+```{r}
+datos |> funModeling::data_integrity()
+```
+
+Esta función se puede asignar a un objeto y se navega a través de éste
+
+```{r}
+metadatos <- datos |> funModeling::data_integrity()
+```
+
+```{r}
+metadatos$results
+```
+
++ Obtengamos el de alguno de los datasets de vuelos
+
+```{r}
+df_aerolineas |> funModeling::data_integrity()
+```
++ Se me hace que este dataset es cero interesante
+
+```{r}
+df_aerolineas |> head()
+```
+
++ Veamos otro un poquito más interesante
+
+```{r}
+df_aeropuertos |> funModeling::data_integrity()
+```
+
+```{r}
+df_vuelos |> funModeling::data_integrity()
+```
+```{r}
+df_vuelos |> head()
+```
+
++ Veamos si efectivamente tiene datos sólo de un año
+
+```{r}
+df_vuelos |> dplyr::select(year) |> unique()
+```
+
++ Regresando a nuestra base de los pingüinos, podemos ver un resumen de esta data_integrity
+
+```{r}
+datos |> funModeling::data_integrity() |> summary()
+```
++ Me parece que este resumen está medio chafa, el objeto data_integrity tiene más info útil
+
++ Podemos obtener rápidamente los histogramas de todas las variables numéricas
+
+```{r}
+datos |> funModeling::plot_num()
+```
+
++ Podemos obtener estadísticas descriptivas de todas las variables numéricas con la función `profiling_num()`
+
+```{r}
+datos |> funModeling::profiling_num()
+```
+
++ Este tipo de resúmenes ya lo habíamos hecho con otras funciones.
+
++ Podemos analizar sólo nuestras variables categóricas
+
+```{r}
+datos |> funModeling::freq()
+```
++ Vamos a aplicar esta función a nuestras categóricas del dataset de vuelos
+
+```{r}
+df_vuelos |> funModeling::freq()
+```
++ Notemos que para las variables categóricas de alta cardinalidad, ni siquiera intentó hacer una visualización... muchas categorías no son buenas para visualizarse.
+
++ Una función que sí me parece útil es la de correlation_table porque sólo nos muestra las correlaciones de todas las columnas numéricas con alguna columna de interés
+
+```{r}
+datos |> funModeling::correlation_table("body_mass_g")
+```
+
++ Esta función es particularmente útil cuando ya traemos en mente hacer algún tipo de análisis supervisado (regresión, árboles, GLM)
+
++ Recuerden que la correlación es un tipo particula de relación entre variable: relación lineal.
+
++ Existen otras medidas/métricas de asociación
+
++ La función `var_rank_info` genera un dataframe que tiene varias métricas relacionadas con la teoría de la información. Las métricas son: entropía (en), información mutua / mutual information (mi), ganancia de información / information gain (ig) y razón de ganancia / ratio gain (gr).
+
+```{r}
+datos |> funModeling::var_rank_info("body_mass_g")
+```
++ Y de hecho, las podemos visualizar de manera sencilla
+
+```{r}
+datos |> var_rank_info("body_mass_g") |>
+  ggplot(aes(x = reorder(var, gr), y = gr, fill = var)) +
+  geom_bar(stat = "identity") + 
+  coord_flip() + 
+  theme_bw() + 
+  xlab("") + 
+  ylab("Importancia de variables con Masa Corporal (basada en Information Gain)") +
+  guides(fill = FALSE)
+```
+
++ Esta librería tiene un par de funciones muy útiles para variables categóricas de cardinalidad 2, i.e. variables binarias
+
+```{r}
+funModeling::cross_plot(data = datos, input = c("island", "species"), target = "sex")
+```
+
++ En este caso, la variable binaria es `sex`
+
++ En el parametro `input` se indica con respecto a qué otra u otras variables categóricas se quiere analizar la variable binaria.
+
++ Pero también esta función la podemos usar para analizar una variable binaria con respecto a alguna variable continua, lo que hace esta función es discretizar la variable continua
+
+```{r}
+funModeling::cross_plot(data = datos, input = "body_mass_g", target = "sex")
+```
+
++ Podemos analizarla con respecto a otra variable continua
+
+```{r}
+funModeling::cross_plot(data = datos, input = "flipper_length_mm", target = "sex")
+```
+
++ Otra variable continua
+
+```{r}
+funModeling::cross_plot(data = datos, input = "bill_length_mm", target = "sex")
+```
+
++ También podemos hacer de manera rápida box-plots con respecto a variables binaria
+
+```{r}
+funModeling::plotar(data = datos, input = "bill_length_mm", target = "sex",
+                    plot_type = "boxplot")
+```
+
++ Tristemente esta función de hacer una gráfica con sólo una línea de código solo se puede para variables binarias con esta librería
+
++ Hay otras librerías que lo pueden hacer para variables categóricas en general.
+
++ Una de estas librerías es {SmartEDA}
+
++ Recordemos que la variable species es categórica pero no binaria
+
+```{r}
+SmartEDA::ExpNumViz(datos, target= "species", col = c("red", "orange", "pink", "blue"))
+```
+
++ También podemos ver la relación de una variable continua específica con todas las otras variables numéricas
+
+```{r}
+SmartEDA::ExpNumViz(datos, target= "body_mass_g")
+```
+
++ También podemos revisar la relación de una variable categórica específica con el resto de las variables categóricas
+
+```{r}
+SmartEDA::ExpCatViz(datos, target= "species")
+```
++ No sólo se puede hacer boxplots, también se pueden hacer densidades esto se hace modificando el parámetro `plot_type = "histdens"`
+
+
+```{r}
+funModeling::plotar(data = datos, input = "bill_length_mm", target = "sex",
+                    plot_type = "histdens")
+```
+
++ Si lo que queremos es los datos de cruces de variables categóricas y no sólo las gráfcias, usamos `categ_analysis`
+
+```{r}
+funModeling::categ_analysis(data = datos, input = "species", target = "sex")
+```
++ PENDIENTE: Este tabla sólo la devuelve para una categoría (female o male) per no sabemos cual... lo averiguaremos la siguiente clase
+
++ Como mencionamos hace un rato, podemos discretizar ciertas columnas numéricas
+
+```{r}
+ptos_corte <- funModeling::discretize_get_bins(data = datos,
+                                               input = "bill_length_mm", n_bins=5)
+
+ptos_corte
+```
+y para efectivamente discretizar, usamos la función discretiza
+
+```{r}
+funModeling::discretize_df(data = datos, data_bins = ptos_corte, stringsAsFactors=T)
+```
+
+Podemos discretizar de otra manera
+
++ `equal_freq` tries to put the same quantity of cases per bin when possible.
+
+```{r}
+discretizacion <- funModeling::equal_freq(datos$bill_depth_mm, n_bins = 5)
+discretizacion
+```
+
++ Y si queremos ver la frecuencia de cada intervalo, pues las describimos
+
+```{r}
+Hmisc::describe(discretizacion)
+```
++ También podemos normalizar a las variables numéricas
+
+$$x_{norm} = \frac{x-min}{max - min}$$
+Esto hace que $x_{norm}$ esté en el intervalo [0,1]. Esto se hace con la función range01
+
+```{r}
+variable_escalada <- funModeling::range01(datos$bill_length_mm)
+
+summary(variable_escalada)
+```
++ Efectivamente esta variable ya tiene como máximo al 1 y como mínimo al 0.
+
++ Una cosa "fea" que tiene esta función es que requiere hacer referencia a la columna que queremos con el operador de `$` i.e. `datos$bill_length_mm`.
+
++ Si quisieremos ponerlo en forma pipeline `objeto |> funcion |> objeto2 |>funcion2 ...`
+
++ Para esto podemos ocupar el operador `%$%` de la librería {magrittr}
+
+```{r}
+datos %$% funModeling::range01(bill_length_mm) |> summary()
+```
++ Ya que estamos en datos normalizados [0,1], la siguiente visualización es muy popular
+
+```{r}
+SmartEDA::ExpParcoord(datos, Group = "species")
+```
+
++ Todos los puntos categóricos no tiene sentido, voy a intentar quitarlos
+
+```{r}
+SmartEDA::ExpParcoord(datos |> dplyr::select(where(is.numeric), species),
+                      Group = "species") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
++ Sigue sin tener sentido los valores en el eje horizontal categóricos... Vamos a intentar arreglarla
+
+```{r}
+SmartEDA::ExpParcoord(datos,
+                      Group = "species",
+                      Nvar=c("bill_length_mm","bill_depth_mm",
+                             "flipper_length_mm","body_mass_g"))
+```
+
+```{r}
+SmartEDA::ExpParcoord(datos,
+                      Group = "sex",
+                      Nvar=c("bill_length_mm","bill_depth_mm",
+                             "flipper_length_mm","body_mass_g"))
+```
+
+```{r}
+SmartEDA::ExpParcoord(datos,
+                      Group = "island",
+                      Nvar=c("bill_length_mm","bill_depth_mm",
+                             "flipper_length_mm","body_mass_g"))
+```
+
+```{r}
+tukey_outlier(datos$bill_length_mm)
+
+summary(datos$bill_length_mm)
+```
+
+```{r}
+hampel_outlier(datos$bill_length_mm)
+
+summary(datos$bill_length_mm)
+```
+
+```{r}
+otros_datos <- ggplot2movies::movies
+head(otros_datos)
+```
+
+```{r}
+tukey_outlier(otros_datos$length)
+
+summary(otros_datos$length)
+```
+
+```{r}
+otros_datos_sin_outliers <- prep_outliers(data = otros_datos,
+                                          input = c('length'),
+                                          method = "tukey", type='set_na')
+
+otros_datos_sin_outliers |> head()
+```
+
+```{r}
+otros_datos |> summary()
+```
+
+```{r}
+otros_datos_sin_outliers |> summary()
+```
