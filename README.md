@@ -17,3 +17,4 @@
 - [Sesion 6: 14 de marzo de 2026](./sesion06): 9:30 a 12:00 hrs. Google Meet
 - [Sesion 7: 17 de marzo de 2026](./sesion07): 18:00 a 20:00 hrs. Google Meet
 - [Sesion 8: 19 de marzo de 2026](./sesion08): 18:00 a 20:30 hrs. Google Meet
+- [Sesion 9: 21 de marzo de 2026](./sesion09): 9:30 a 12:00 hrs. Google Meet
