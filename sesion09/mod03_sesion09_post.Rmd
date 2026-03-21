@@ -1,0 +1,514 @@
+---
+title: "Sesión 9"
+author: "Eduardo Martínez"
+date: "21 de marzo de 2026"
+output:
+  html_document: default
+---
+
+# Algunas técnicas de Aprendizaje No-Supervisado para EDA
+
++ ¿Tienen nociones de qué es análisis supervisado y no-supervisado?
+
++ Aunque van a ver con detalle esto en los siguientes módulos (5 y 6) vamos a dar una intuición
+
++ En aprendizaje supervisado tiene un conjunto de variables, se ha identificado una de ellas como especial y se esta buscando entender como las otras variables ayudan a explicar a esta variable especial.
+
++ **Notación** $Y$: Es esta variable especial. Le llamamos variable objetivo, variable respuesta o variable supervisora. Al resto de las variables las denotamos como $X_1,X_2,\ldots,X_p$ y las llamamos variables explicativas.
+
++ Con esta notación, en aprendizaje supervisado, se pretende buscar una función $g$ que relacione a la variable respuesta con las variable explicativas, i.e. $Y = g(X_1,X_2,\ldots,X_n)$
+
++ Dicho esto, ¿han visto alguna técnica de aprendizaje supervisado? Sí
+
++ Ejemplo clásico por excelencia es la regresión lineal
+$$Y = \beta_0 + \beta_1X_1 + \beta_2X_2 + \ldots + \beta_pX_p$$
+
++ Por analogía, en el aprendizaje no-supervisado NO se tiene una variable más especial que las otras, simplemente se tienen variables $X_1,X_2,\ldots,X_p$ y lo que se busca es entender la estructura intrínseca entre éstas.
+
++ Ejemplos: Clusterización (meter en grupitos a los datos), reducción de dimensionalidad i.e. quitar información redundante (las técnicas clásicas son Análisis de Componentes Principales (Principal Component Analysis) y Vecinos $t$ estocásticos).
+
++ Como esto sólo pretende ser una ayuda para hacer el EDA, sólo introduciremos PCA 
+
+
+## Análisis de Componentes Principales
+
+```{r}
+# Graficación
+library(ggplot2)
+library(ggrepel)
+library(corrplot)
+
+# Manejo y operaciones de dataframes
+library(tibble)
+library(dplyr)
+library(tidyr)
+
+# La carnita de la sesión, son las PCA y clusterización
+library(factoextra)
+library(cluster)
+```
+
++ El **Análisis de Componentes Principales** (Principal Component Analysis, PCA) es una técnica de reducción de dimensionalidad... i.e. pasar de muchas columnas a idealmente menos columnas. O bien, quitar información redundante.
+
++ ¿Qué hace? Transforma un conjunto de datos de posibles variables posiblemente correlacionadas en un nuevo conjunto de variables no correlacionadas
+
++ La nuevas variables se conocen como **componentes principales**, i.e. son variables que no están correlacionadas.
+
++ En principio, sólo vamos a trabajar con columnas numéricas.
+
++ Esta transformación, no es una transformación cualquiera. De hecho intenta conservar la mayor cantidad de información (varianza) posible, i.e. intenta que la variabilidad del conjunto de datos original se conserve lo más posible en el "nuevo" dataset.
+
++ Lo que está suponiendo es que en la información con gran variabilidad está la ''carnita'' de la información, i.e. lo más importante.
+
++ ¿Para qué se usa PCA?
+
+1. Para reducir el número de variables manteniendo los patrones más relevantes.
+
+2. Para visualizar datos de muchas dimensiones físicas (por ejemplo, en 2D o 3D [no la recomiendo mucho]), i.e. para intentar visualizar algo en $n$ dimensiones, en sólo 2 dimensiones.
+
+3. Para eliminar ruido o redundancia en los datos.
+
+4. Para acelerar otros algoritmos de machine learning (lo verán en las siguientes semanas)... i.e. "simplificar" en términos de complejidad nuestros modelos de ML.
+
++ **Importante**: Es un método lineal, i.e. puede no funcionar bien con relaciones no lineales. Recordatorio: correlación = relación lineal.
+
++ **Cuidado/Doloroso**: Interpretar las componentes principales puede ser difícil pues representan dimensiones abstractas.... ahorita veremos a qué me refiero.
+
++ Imagina que tienes un conjunto de datos en 3D, pero la mayor variación se encuentra sobre un plano inclinado incrustado en ese espacio 3D.
+
++ PCA intenta identificar ese plano y permite “aplanar” los datos sobre él, i.e. reduce a 2D pero conservando la estructura principal.
+
++ Para las personas que tienen un contexto analítico más formal... pues simplemente un cambio de coordenadas y una proyección (Algebra Lineal, Geo. Analítica 2, Cálculo III)
+
++ Los componentes principales son combinaciones lineales de las variables originales.
+
++ Si $$X_1, X_2,\ldots, X_p$$ son nuestras variables originales (i.e. nuestras columnas originales), entonces cada componente principal es de la forma
+
+$$CP_j = \phi_{j,1}X_1 + \phi_{j,2}X_2 + \ldots + \phi_{j,p}X_p$$
+donde los $\phi$'s son las ponderaciones de dicha combinación lineal
+
++ Formalmente si hay $p$ variables, habrá $p$ componentes principales..... PEEERO buscamos que con menos componentes principales, se logre "atrapar" mucha de la variablidad del dataset original.
+
++ Es decir, me quedaré con $$CP_1,CP_2,\ldots, CP_k$$ donde $k<p$... es precisamente esto la reducción de dimensionalidad.
+
++ Se utilizarán conceptos de álgebra lineal como eigenvalores, eigenvectores y la descomposición en valores singulares (SVD)... pero se estresen con esto... R lo hace por ustedes.
+
++ Una de las partes más importantes en PCA es encontrar los eigenvalores y eigenvectores de la **matriz de covarianzas**
+
++ Resultado: Es simétrica, sus eigenvalores son reales y no negativos, y sus eigenvectores son ortogonales y normalizados... i.e. los eigenvectores son perpendiculares entre sí.... Recuerdos del curso de Alg. Lineal
+
++ Se ordenan los eigenvectores con respecto a sus eigenvalores de mayor a menor
+
++ La primera componente principal es el eigenvector con el mayor eigenvalor
+
++ Es decir, las componentes principales son los eigenvectores de la matriz de covarianzas.
+
++ Después de todo este rollo...
+
+## Los datos con los que trabajaremos
+
+```{r}
+datos <- factoextra::decathlon2
+head(datos)
+```
+
++ Es info de los puntajes de ciertos participantes en las 10 disciplinas del decatlón
+
++ Si se fijan el nombre de la persona no es formalmente una columna del dataframe, es en realidad un índice o el nombre del renglón.
+
++ Hagamos que este nombre efectivamente sea una columna
+
+```{r}
+datos_con_jugador <- datos |> tibble::rownames_to_column(var = "competidor")
+head(datos_con_jugador)
+```
+
++ Las columnas Rank, Points y Competition no nos interesan. Por el momento sólo nos interesan los puntajes de las 10 disciplinas.
+
+```{r}
+datos_con_jugador |> ggplot() +
+  geom_point(aes(x = Rank, y = Points)) +
+  geom_text_repel(aes(x = Rank, y = Points,
+                 label = competidor),
+                 size = 3) +
+  facet_grid(~ Competition) +
+  theme_light()
+```
+
++ Sólo me quedaré con las 10 columnas que representan la calificación en cada disciplina
+
+```{r}
+datos_num <- datos |> dplyr::select(X100m:X1500m)
+head(datos_num)
+```
+
++ Veamos la matriz de correlación de los datos originales
+
+```{r}
+datos_num |> cor() |> corrplot(order = 'AOE', addCoef.col = 'black', tl.pos = 'd',
+                               cl.pos = 'n', col = COL2('PiYG')) 
+```
+
++ Podemos ver que hay variables relacionadas fuertemente (ya sea positiva o negativamente) y otras que no tanto
+
++ Sólo por curiosidad, voy a quitar a 4 observaciones para calcular las componentes principales con el resto y después ver cómo se ven estas 4 observaciones en las nuevas dimensiones
+
+```{r}
+datos_train <- datos_num[1:23,] # Con esto calcularé las componetes principales
+datos_test <- datos_num[24:27,]
+```
+
+```{r}
+dim(datos_train)
+```
+
+```{r}
+dim(datos_test)
+```
+
++ La función para llevar a cabo el cálculo de las componentes principales, es `prcomp`
+
+```{r}
+mi_pca <- prcomp(datos_train, scale = TRUE)
+```
+
++ **Importantísimo:** El parámetro scale siempre debe ser TRUE... pues generalmente las columnas originales están en diferentes unidades de magnitud. Se escalan las variables para poder compararlas entre sí
+
++ ¿Qué tipo de objeto es el output de esta función?
+
+```{r}
+mi_pca |> str()
+```
++ Por ahora todo lo que tiene el objeto no me interesa (me interesará por allá del módulo 5)
+
++ Veamos un pequeño resumen del output de la función
+
+```{r}
+mi_pca |> summary()
+```
+
++ A criterio de la investigadora, seleccionará tantas componentes principales como variabilidad esté dispuesta de perder.
+
++ Con las primeras dos componentes, alcanzo a explicar el 59.63% de la variabilidad
+
++ Con las primeras 3, el 72.02%
+
++ Con las primeras 4, el 80.2%... con este nivel a mí Lalo me es suficiente subjetivamente (por supesto), en función de mi experiencia en el fenónemo, alguna recomendación de la literatura para el fenómeno o simplemente mi capricho.
+
+Si se eligen los $k$ primeros eigenvectores, se forma una matriz de proyección
+$$W_k = [CP_1 | CP_2 | \cdots | CP_k]$$
+
++ Para transformar los datos al nuevo espacio PCA
+$$Z = XW_k$$
+donde $Z$ es el nuevo conjunto de datos en un espacio reducido y $X$ es el conjunto de datos originales escalado, i.e.
+
+$$X = [X_1 | X_2 | \ldots | X_p]$$
+escalados
+
++ La proporción de varianza explicada (PVE) por cada componente
+$$PVE_k = \frac{\lambda_k}{\lambda_1 + \lambda_2 + \ldots + \lambda_p}$$
+donde $\lambda_k$ es el $k$-ésimo eigenvalor.
+
++ Un gráfico de codo (scree plot) ayuda a visualizar cuántos componentes retienen la mayor parte de la varianza.
+
+```{r}
+mi_pca |> factoextra::fviz_eig()
+```
+
++ En este caso, la sugerencia visual del gráfico de codo es quedarnos con 2 componentes principales
+
++ Algunas métricas relacionadas para ver qué tan buena es la representación son:
+
+1. $cos^2$ es la abreviatura de coseno al cuadrado del ángulo entre el vector de una variable o una observación, y el eje de un componente principal
+
+2. Sirve para medir qué tan bien está representado un individuo o una variable en un componente determinado.
+
++ Supóngase que se tiene una observación $i$, y sus coordenadas sobre los primeros $k$ componentes son $$z_{i1}, z_{i2}, \ldots, z_{ik}$$
+
+La distancia euclidiana al origen es
+$$||z_i||^2 = z_{i1}^2 + z_{i2}^2 + \ldots + z_{ik}^2$$
+
+Entonces, el $cos^2$ del individuo $i$ en el componente $j$ es
+$$cos^2(i,j) = \frac{z_{ij}^2}{||z_i||^2}$$
+
++ Esto responde a la pregunta ¿Qué tanto de la posición del punto está explicado por este componente?
+
++ Para una variable $x_j$, su correlación con el componente $PC_k$ es
+$$corr(x_j, PC_k) = cos(\theta)$$
+entonces
+$$cos^2(\theta) = corr^2(x_j, PC_k)$$
++ Esto mide qué tanto contribuye una variable a un componente principal
+
+- $cos^2$ cercano a 1, significa que el componente explica muy bien al punto o variable
+
+- $cos^2$ cercano a 0, significa que el componente no explica mucho a ese punto o variable
+
++ Es común usar lo que se conoce como **círculo de correlación**, en donde el $cos^2$ indica cuáles variables están bien representadas por los componentes (las que están cerca del borde del círculo lo están mejor).
+
++ Generemos este círculo para los renglones i.e. los individuos
+
+```{r}
+mi_pca |> fviz_pca_ind(col.ind = "cos2",
+                       gradient.cols = c("blue", "green", "red"),
+                       repel = TRUE)
+```
++ Para una visualización del **círculo de correlación** PARA LAS DIMENSIONES ORIGINALES
+
+```{r}
+mi_pca |> fviz_pca_var(col.var = "contrib",
+                       gradient.cols = c("blue", "green", "red"),
+                       repel = TRUE)
+```
+
++ En un biplot se ven los individuos en el espacio de las dos componentes principales y cómo se relacionan con las variables originales
+
+```{r}
+mi_pca |> fviz_pca_biplot(repel = TRUE, col.var = "purple", col.ind = "green")
+```
+
+```{r}
+mi_pca |> factoextra::get_eigenvalue()
+```
+
+```{r}
+mi_pca |> factoextra::get_pca_var()
+```
+
+```{r}
+objetos_mi_pca <- mi_pca |> factoextra::get_pca_var()
+```
+
+```{r}
+objetos_mi_pca$coord |> as.data.frame()
+```
+
+```{r}
+objetos_mi_pca$cor |> as.data.frame()
+```
+
+```{r}
+objetos_mi_pca$cos2 |> as.data.frame()
+```
+
+```{r}
+objetos_mi_pca$contrib |> as.data.frame()
+```
+
+```{r}
+mi_pca |> factoextra::get_pca_ind()
+```
+```{r}
+objetos_mi_pca_ind <- mi_pca |> factoextra::get_pca_ind()
+```
+
+```{r}
+objetos_mi_pca_ind$coord |> as.data.frame()
+```
+
+```{r}
+objetos_mi_pca_ind$contrib |> as.data.frame()
+```
+
+```{r}
+objetos_mi_pca_ind$cos2 |> as.data.frame()
+```
+
++ Yo saqué a 4 fulanos, antes de obtener las componentes principales, i.e. su variabilidad no fue considerada en la construcción de las componentes principales
+
++ Voy a ver cómo se ven estas 4 variables en el nuevo sistema coordenado
+
+```{r}
+predict(mi_pca, newdata = datos_test)
+```
+
+```{r}
+mi_pca_pred <- predict(mi_pca, newdata = datos_test)
+```
+
++ Voy a ver cómo se ven estos 4 puntos en el nuevo sistema coordenado
+
+```{r}
+graf <- fviz_pca_ind(mi_pca, repel = TRUE)
+fviz_add(graf, mi_pca_pred , color ="red")
+```
+
++ Nosotros además contamos con la variable de competencia (decastar y juegos olimpicos), la puedo incluir visualmente en mi análisis
+
+```{r}
+grupos <- datos$Competition[1:23] |> as.factor()
+```
+
+```{r}
+fviz_pca_ind(mi_pca,
+             col.ind = grupos,
+             palette = c("navyblue",  "orange"),
+             addEllipses = TRUE,
+             ellipse.type = "confidence",
+             legend.title = "Competencia",
+             repel = TRUE)
+```
+
++ También tenemos la variable de ranking y puntaje 
+
+```{r}
+variables_calif <- datos[1:23, 11:12, drop = FALSE]
+variables_calif |> head()
+```
+
+```{r}
+coord_variables_calif <- cor(variables_calif, mi_pca$x)
+coord_variables_calif
+```
+
+```{r}
+vars_calif_cos2 <- coord_variables_calif^2
+```
+
+```{r}
+graf <- fviz_pca_var(mi_pca)
+fviz_add(graf, coord_variables_calif, color ="blue", geom="arrow")
+```
+
+# Clustering
+
++ A veces, es útil meter nuestros datos (renglones) en grupitos para analizarlos por cada grupito.
+
++ ¿Cómo formo ese grupito? Hay varias formas, pero ahora sólo veremos k medias, i.e. se formarán k grupitos, de tal forma que la "variabilidad" en cada grupito sea lo más pequeña posible... i.e. estos grupitos sean lo más homogeneos internamente
+
++ Un plus es que sean muy diferentes externamente, i.e. que entre grupitos sean muy diferentes.
+
+## Agrupamiento de crímenes de EUA
+
+```{r}
+datos <- USArrests
+head(datos)
+```
+
++ This data set contains statistics, in arrests per 100,000 residents for assault, murder, and rape in each of the 50 US states in 1973. Also given is the percent of the population living in urban areas.
+
++ Quiero construir grupitos basándome en estas 4 variables
+
++ Lo primero que tengo que hacer es escalarlos para ponerlos en el mismo orden de magnitud
+
+```{r}
+datos_escalados <- datos |> scale() |> as.data.frame()
+datos_escalados |> head()
+```
+
++ Es útil quedarse con los datos escalados y los datos originales juntos
+
+```{r}
+names(datos_escalados) <- names(datos_escalados) |> paste0("_esc")
+```
+
+```{r}
+datos_escalados |> head()
+```
+
++ Para formar los grupitos a partir del algoritmo kmeans ocupo la función kmeans()
+
+```{r}
+set.seed(123456)
+# En este caso quiero 4 grupitos
+mi_kmeans <- kmeans(datos_escalados, centers = 4)
+```
+
++ Qué output tiene esta función
+
+```{r}
+mi_kmeans
+```
+
+```{r}
+mi_kmeans |> str()
+```
+
++ Voy a agregarle el grupito que obtuve a mi dataset... pues para poder usarlo
+
+```{r}
+datos_con_cluster <- datos_escalados |>
+  dplyr::mutate(cluster = mi_kmeans$cluster) |>
+  dplyr::mutate(cluster = as.factor(cluster)) |>
+  cbind(datos)
+
+datos_con_cluster <- datos_con_cluster |> tibble::rownames_to_column(var = "estado")
+```
+
+```{r}
+head(datos_con_cluster)
+```
+
++ Hagamos una primera visualización que use estos grupitos que generé
+
+```{r}
+datos_con_cluster |> ggplot() +
+  geom_point(aes(x = Murder_esc, y = Assault_esc,
+                 color = cluster,
+                 size = UrbanPop)) +
+  theme_light()
+```
+
+```{r}
+datos_con_cluster |> ggplot() +
+  geom_point(aes(x = Murder_esc, y = Rape_esc,
+                 color = cluster,
+                 size = UrbanPop)) +
+  theme_light()
+```
+
+```{r}
+datos_con_cluster |> ggplot() +
+  geom_point(aes(x = Murder, y = Rape,
+                 color = cluster,
+                 size = UrbanPop)) +
+  theme_light()
+```
+
+```{r}
+datos_con_cluster |> ggplot() +
+  geom_point(aes(x = Murder, y = Assault,
+                 color = cluster,
+                 size = UrbanPop)) +
+  geom_text_repel(aes(x = Murder, y = Assault,
+                 label = estado,
+                 color = cluster),
+                 size = 3) +
+  theme_light()
+```
+
+```{r}
+datos_con_cluster |> ggplot() +
+  geom_point(aes(x = Murder, y = Rape,
+                 color = cluster,
+                 size = UrbanPop)) +
+  geom_text_repel(aes(x = Murder, y = Rape,
+                 label = estado,
+                 color = cluster),
+                 size = 3) +
+  theme_light()
+```
+
++ Podemos ver qué tan buena es este agrupamiento en las 2 primeras componentes principales
+
+```{r}
+factoextra::fviz_cluster(mi_kmeans, data = datos_escalados,
+             star.plot = TRUE,
+             repel = TRUE,
+             ggtheme = theme_light())
+```
+
++ ¿Porqué Lalo escogió 4 grupitos? Pues en realidad hice un poco de trampa, pues use un gráfico de codo y la gap statistic (la estadística de lejanía) para escoger este 4 que resulto tan bueno
+
+```{r}
+factoextra::fviz_nbclust(datos_escalados, kmeans, method = "wss")
+```
++ Si sienten incómodos con el gráfico de codo, podemos obtener la métrica de lejanía
+
+```{r}
+set.seed(123456)
+gap_stat <- cluster::clusGap(datos_escalados, FUN = kmeans, K.max = 10)
+```
+
+```{r}
+factoextra::fviz_gap_stat(gap_stat)
+```
